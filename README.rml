@@ -1,6 +1,7 @@
 [title]Input Recorder[/]
 [subtitle]Record and play back keyboard and mouse input[/]
 A small [b]GUI-application[/] that makes it easy to [b]record[/], [b]play back[/] and share [b]keyboard and mouse[/] input in shape of a [b]macro[/].
+Windows only.
 
 [s1]Features[/]
 1. Record [b]mouse movement[/] and [b]mouse buttons[/]
