@@ -9,3 +9,5 @@ Windows only\.
 3\. **Play back** recorded macros  
 4\. **Save and load** recorded macros  
 5\. **Restrict** recorded macros to be playable **once only**
+
+![Input Recorder](/screenshot.png?raw=true)
