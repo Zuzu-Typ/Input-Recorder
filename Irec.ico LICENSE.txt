@@ -1,0 +1,5 @@
+Copyright (c) 2018 Zuzu_Typ
+
+Irec.ico is distributed via the Creative Commons Attribution-ShareAlike 3.0 Unported license.
+To view a copy of this license, visit http://creativecommons.org/licenses/by-sa/3.0/ or send a letter to Creative Commons, PO Box 1866, Mountain View, CA 94042, USA.
+It uses art by Lordalpha1 (adapted by Beao) ( https://commons.wikimedia.org/wiki/File:Mouse-cursor-hand-pointer.svg ) and by JayWalsh ( https://commons.wikimedia.org/wiki/File:Keyboard-icon_Wikipedians.svg )
