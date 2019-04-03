@@ -2,7 +2,7 @@
 
 # By Zuzu_Typ
 
-import pythoncom, ctypes
+import ctypes
 import os
 from ctypes import wintypes
 
@@ -25,11 +25,15 @@ except ImportError: # Python 3
 
 RECORD_MOVEMENT = True
 
+MIN_FPS = 20
+
 WAIT_BETWEEN_ACTIONS = True
 
 SAVE_COMPRESSED = True
 
 IS_LOCKED = False
+
+IS_RELATIVE = False
 
 # lang
 
@@ -46,8 +50,11 @@ stop_recording_key = winput.VK_ESCAPE
 macros = {}
 current_macro = []
 time_delta = 0
-last_time = time.time()
+start_time = time.time()
+last_time = 0
+last_flip = time.time()
 options = {}
+screen_res = (800,600)
 
 user32 = ctypes.WinDLL('user32', use_last_error=True)
 
@@ -180,15 +187,23 @@ def getMousePosition():
     return (pt.x, pt.y)
 
 def hookAllEvents(event):
-    global current_macro, time_delta, last_time, RECORD_MOVEMENT, hookManager, options, stop_recording_key
+    global current_macro, time_delta, start_time, last_time, RECORD_MOVEMENT, hookManager, options, stop_recording_key, IS_RELATIVE, screen_res, last_flip, MIN_FPS
+    IS_RELATIVE = (IS_RELATIVE or options["relative"].get())
 
     this_time = time.time()
-    time_delta = (this_time - last_time)
-    last_time = this_time
+    time_delta = ((this_time - start_time) - last_time)
+    last_time = this_time - start_time
+
+    if (this_time - last_flip) > 1./MIN_FPS:
+        root.update()
+        last_flip = this_time
 
     if event.type == "MouseEvent":
         if options["mouse"].get():
             x, y = event.position
+            if IS_RELATIVE:
+                x = round(float(x)/screen_res[0], 5)
+                y = round(float(y)/screen_res[1], 5)
             if event.action == winput.WM_MOUSEMOVE:
                 if RECORD_MOVEMENT: 
                     current_macro.append((time_delta, winput.WM_MOUSEMOVE, x, y))
@@ -209,12 +224,14 @@ def hookAllEvents(event):
             current_macro.append((time_delta, event.action, key_vkCode))
 
 def createNewMacro(name = None):
-    global macros, current_macro, last_time, options
+    global macros, current_macro, last_time, options, start_time, last_flip
 
     if not name:
         name = "Macro #{}".format(len(macros))
-
-    last_time = time.time()
+        
+    start_time = time.time()
+    last_time = 0
+    last_flip = time.time()
     
     winput.hook_mouse(hookAllEvents)
     winput.hook_keyboard(hookAllEvents)
@@ -229,19 +246,24 @@ def getMacros():
     return macros
 
 def playMacro(macro):
-    global WAIT_BETWEEN_ACTIONS, last_time, root
+    global WAIT_BETWEEN_ACTIONS, last_time, root, IS_RELATIVE, options, screen_res, last_flip, MIN_FPS
+    IS_RELATIVE = (IS_RELATIVE or options["relative"].get())
+    total_time = 0
+    start_time = time.time()
+    last_time = 0
     for action in macro:
         this_time = time.time()
-
-        time_since_last_event = this_time - last_time
-
-        last_time = this_time
+        total_time += action[0]
+        if (this_time - last_flip) > 1./MIN_FPS:
+            root.update()
+            last_flip = this_time
         
-        time_delta = max(action[0] - time_since_last_event, 0)
+        time_delta = max(total_time - (this_time-start_time),0) 
+        
         action_type = int(action[1])
         
         if WAIT_BETWEEN_ACTIONS:
-            time.sleep(time_delta)
+            if time_delta: time.sleep(time_delta)
             
         if action_type in (winput.WM_KEYUP, winput.WM_SYSKEYUP, winput.WM_KEYDOWN, winput.WM_SYSKEYDOWN):
             key = int(action[2])
@@ -251,12 +273,12 @@ def playMacro(macro):
                 PressKey(key)
 
         elif action_type == winput.WM_MOUSEMOVE:
-            desired_position = (int(action[2]), int(action[3]))
+            desired_position = (int(round(action[2] * screen_res[0],0)), int(round(action[3] * screen_res[1],0))) if IS_RELATIVE else (int(action[2]), int(action[3]))
             user32.SetCursorPos(*desired_position)
 
         else:
             current_mouse_position = getMousePosition()
-            relative_position = (int(action[2]) - current_mouse_position[0], int(action[3]) - current_mouse_position[1])
+            relative_position = (int(round(action[2] * screen_res[0],0)) - current_mouse_position[0], int(round(action[3] * screen_res[1],0)) - current_mouse_position[1]) if IS_RELATIVE else (int(action[2]) - current_mouse_position[0], int(action[3]) - current_mouse_position[1])
 
             mouse_change = 0x0002 if action_type == winput.WM_LBUTTONDOWN else \
                            0x0004 if action_type == winput.WM_LBUTTONUP else \
@@ -270,11 +292,13 @@ def playMacro(macro):
             root.update()
         
 def saveMacros(macros, filename):
-    global options, SAVE_COMPRESSED
+    global options, SAVE_COMPRESSED, IS_RELATIVE
     file_ = open(filename,"wb")
     file_content = "*{}".format(filename)
     if options["once"].get():
         file_content += " -o"
+    if (options["relative"].get() or IS_RELATIVE):
+        file_content += " -r"
 
     file_content += "\n"
     for macro_name in macros:
@@ -294,7 +318,7 @@ def saveMacros(macros, filename):
     file_.close()
 
 def loadMacros(filename):
-    global config, IS_LOCKED, button_create_new_macro, button_save_macros
+    global config, IS_LOCKED, button_create_new_macro, button_save_macros, IS_RELATIVE
     macros = {}
     
     file_ = open(filename, "rb")
@@ -329,20 +353,27 @@ def loadMacros(filename):
 
             if config.get(os.path.basename(line_split[0])):
                 IS_LOCKED = False
+                IS_RELATIVE = False
                 button_create_new_macro.config(state=NORMAL)
                 button_save_macros.config(state=NORMAL)
                 return
 
-            if len(line_split) == 2:
+            if "-o" in line_split:
                 IS_LOCKED = True
                 button_create_new_macro.config(state=DISABLED)
                 button_save_macros.config(state=DISABLED)
                 config.add(os.path.basename(line_split[0]))
-                
+                continue
+
+            if "-r" in line_split:
+                IS_RELATIVE = True
             else:
-                IS_LOCKED = False
-                button_create_new_macro.config(state=NORMAL)
-                button_save_macros.config(state=NORMAL)
+                IS_RELATIVE = False
+                
+            IS_LOCKED = False
+            button_create_new_macro.config(state=NORMAL)
+            button_save_macros.config(state=NORMAL)
+            continue
                 
         if line[0] == "|":
             if macro:
@@ -357,9 +388,9 @@ def loadMacros(filename):
 
 
         values = line.split(",")
-        action = [float(values[0].strip()), values[1].strip(), int(values[2].strip())]
+        action = [float(values[0].strip()), values[1].strip(), eval(values[2].strip())]
         if len(values) == 4: # motion
-            action.append(int(values[3].strip()))
+            action.append(eval(values[3].strip()))
                           
         macro.append(action)
     if macro:
@@ -410,10 +441,12 @@ def choose_stop_recording_key():
     winput.unhook_keyboard()
 
 def launchGUI():
-    global macros, options, IS_LOCKED, button_create_new_macro, button_save_macros, button_choose_stop_recording_key, stop_recording_key, root
+    global macros, options, IS_LOCKED, button_create_new_macro, button_save_macros, button_choose_stop_recording_key, stop_recording_key, root, screen_res
     root = Tk()
 
-    options = {"once" : IntVar(), "keyboard" : IntVar(value=1), "mouse": IntVar(value=1)}
+    screen_res = (root.winfo_screenwidth(), root.winfo_screenheight())
+
+    options = {"once" : IntVar(), "keyboard" : IntVar(value=1), "mouse": IntVar(value=1), "relative" : IntVar(value=0)}
 
     try: root.iconbitmap('Irec.ico')
     except: pass
@@ -476,7 +509,10 @@ def launchGUI():
         checkbuttonMouse.grid(row=1,column=2)
 
         checkbuttonOnce = ttk.Checkbutton(root, text="Play once", variable = options["once"])
-        checkbuttonOnce.grid(row=2,column=1, columnspan=2)
+        checkbuttonOnce.grid(row=2,column=1)
+        
+        checkbuttonRelative = ttk.Checkbutton(root, text="Relative coords", variable = options["relative"])
+        checkbuttonRelative.grid(row=2,column=2)
 
     def deleteMacro(*e):
         if listbox.curselection():
