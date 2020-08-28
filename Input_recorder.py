@@ -472,7 +472,7 @@ def launchGUI():
             listbox.insert(END, macro_name)
 
     canvas_is_recording = Canvas(root, bg = "white", width = 80, height = 80)
-    canvas_is_recording.grid(row=9,column=1,columnspan=2)
+    canvas_is_recording.grid(row=9,column=0, columnspan=3)
 
     canvas_is_recording.create_rectangle(20,20,60,60, fill = "#161616")
     
@@ -506,7 +506,7 @@ def launchGUI():
         checkbuttonKeyboard.grid(row=1,column=1)
 
         checkbuttonMouse = ttk.Checkbutton(root, text="Mouse", variable = options["mouse"])
-        checkbuttonMouse.grid(row=1,column=2)
+        checkbuttonMouse.grid(row=1,column=2, sticky=W)
 
         checkbuttonOnce = ttk.Checkbutton(root, text="Play once", variable = options["once"])
         checkbuttonOnce.grid(row=2,column=1)
@@ -538,7 +538,7 @@ def launchGUI():
                 deleteMacro(True)
 
     label_repetitions_entry = ttk.Label(root, text = "Macro repetitions:")
-    label_repetitions_entry.grid(row=8,column=1)
+    label_repetitions_entry.grid(row=8,column=1, sticky=W+E)
     options["repetitions"] = IntVar()
     options["repetitions"].set(1)
     repetitions_entry = ttk.Entry(root, width = 10, textvariable = options["repetitions"])
