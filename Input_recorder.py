@@ -472,7 +472,7 @@ def launchGUI():
             listbox.insert(END, macro_name)
 
     canvas_is_recording = Canvas(root, bg = "white", width = 80, height = 80)
-    canvas_is_recording.grid(row=8,column=1,columnspan=2)
+    canvas_is_recording.grid(row=9,column=1,columnspan=2)
 
     canvas_is_recording.create_rectangle(20,20,60,60, fill = "#161616")
     
@@ -521,6 +521,10 @@ def launchGUI():
                 macros.pop(macro)
                 listbox.delete(listbox.curselection())
 
+    def _dialogRunMacro():
+        for _ in range(options["repetitions"].get()):
+            dialogRunMacro()
+
     def dialogRunMacro():
         global macros, root
         if listbox.curselection():
@@ -533,7 +537,14 @@ def launchGUI():
             if IS_LOCKED:
                 deleteMacro(True)
 
-    button_run_macro = ttk.Button(root,text = "Run macro", command = dialogRunMacro)
+    label_repetitions_entry = ttk.Label(root, text = "Macro repetitions:")
+    label_repetitions_entry.grid(row=8,column=1)
+    options["repetitions"] = IntVar()
+    options["repetitions"].set(1)
+    repetitions_entry = ttk.Entry(root, width = 10, textvariable = options["repetitions"])
+    repetitions_entry.grid(row=8,column=2)
+
+    button_run_macro = ttk.Button(root,text = "Run macro", command = _dialogRunMacro)
     button_run_macro.grid(row=3,column=1, columnspan=2, sticky=W+E)
 
     if IS_LOCKED:
