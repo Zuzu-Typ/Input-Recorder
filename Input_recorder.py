@@ -198,7 +198,7 @@ def hookAllEvents(event):
         root.update()
         last_flip = this_time
 
-    if event.type == "MouseEvent":
+    if type(event) == winput.MouseEvent:
         if options["mouse"].get():
             x, y = event.position
             if IS_RELATIVE:
@@ -219,6 +219,7 @@ def hookAllEvents(event):
                 winput.unhook_mouse()
                 winput.unhook_keyboard()
                 winput.stop()
+                return
                 
         if options["keyboard"].get():
             current_macro.append((time_delta, event.action, key_vkCode))
@@ -246,16 +247,19 @@ def getMacros():
     return macros
 
 def playMacro(macro):
-    global WAIT_BETWEEN_ACTIONS, last_time, root, IS_RELATIVE, options, screen_res, last_flip, MIN_FPS
+    global WAIT_BETWEEN_ACTIONS, last_time, root, IS_RELATIVE, options, screen_res, last_flip, MIN_FPS, STOP_PLAYING
     IS_RELATIVE = (IS_RELATIVE or options["relative"].get())
     total_time = 0
     start_time = time.time()
     last_time = 0
     for action in macro:
+        if (STOP_PLAYING):
+            break
         this_time = time.time()
         total_time += action[0]
         if (this_time - last_flip) > 1./MIN_FPS:
             root.update()
+            winput.get_message()
             last_flip = this_time
         
         time_delta = max(total_time - (this_time-start_time),0) 
@@ -446,7 +450,7 @@ def launchGUI():
 
     screen_res = (root.winfo_screenwidth(), root.winfo_screenheight())
 
-    options = {"once" : IntVar(), "keyboard" : IntVar(value=1), "mouse": IntVar(value=1), "relative" : IntVar(value=0)}
+    options = {"once" : IntVar(), "keyboard" : IntVar(value=1), "mouse": IntVar(value=1), "relative" : IntVar(value=0), "repetitions" : IntVar(value=1)}
 
     try: root.iconbitmap('Irec.ico')
     except: pass
@@ -521,17 +525,33 @@ def launchGUI():
                 macros.pop(macro)
                 listbox.delete(listbox.curselection())
 
-    def _dialogRunMacro():
-        for _ in range(options["repetitions"].get()):
-            dialogRunMacro()
-
     def dialogRunMacro():
-        global macros, root
+        global macros, root, STOP_PLAYING
+        STOP_PLAYING = False
         if listbox.curselection():
             canvas_is_recording.delete(ALL)
             canvas_is_recording.create_polygon(20,20,60,40,20,60, fill="blue")
             root.update()
-            playMacro(macros[listbox.get(listbox.curselection())])
+            macro = macros[listbox.get(listbox.curselection())]
+            
+            def interrupt(event):
+                global STOP_PLAYING, stop_recording_key
+                if event.vkCode == stop_recording_key:
+                    STOP_PLAYING = True
+                    
+            winput.hook_keyboard(interrupt)
+            repetitions = options["repetitions"].get()
+            
+            if repetitions == 0:
+                while not STOP_PLAYING:
+                    playMacro(macro)
+            else:
+                for i in range(repetitions):
+                    if STOP_PLAYING:
+                        break
+                    playMacro(macro)
+
+            winput.unhook_keyboard()
             canvas_is_recording.delete(ALL)
             canvas_is_recording.create_rectangle(20,20,60,60, fill = "#161616")
             if IS_LOCKED:
@@ -539,12 +559,10 @@ def launchGUI():
 
     label_repetitions_entry = ttk.Label(root, text = "Macro repetitions:")
     label_repetitions_entry.grid(row=8,column=1, sticky=W+E)
-    options["repetitions"] = IntVar()
-    options["repetitions"].set(1)
-    repetitions_entry = ttk.Entry(root, width = 10, textvariable = options["repetitions"])
+    repetitions_entry = ttk.Spinbox(root, from_=0, to=2**20, textvariable = options["repetitions"])
     repetitions_entry.grid(row=8,column=2)
 
-    button_run_macro = ttk.Button(root,text = "Run macro", command = _dialogRunMacro)
+    button_run_macro = ttk.Button(root,text = "Run macro", command = dialogRunMacro)
     button_run_macro.grid(row=3,column=1, columnspan=2, sticky=W+E)
 
     if IS_LOCKED:
