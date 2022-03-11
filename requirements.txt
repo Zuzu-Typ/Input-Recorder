@@ -1,1 +1,1 @@
-winput
+winput>=1.3.0

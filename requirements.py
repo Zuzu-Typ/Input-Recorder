@@ -10,12 +10,12 @@ popen = subprocess.Popen(install_command,
                          stderr=subprocess.PIPE,
                          universal_newlines=True,
                          shell=True)
-if os.environ.get("PyPI_REQUIREMENTS_OUTPUT", "OFF").upper() == "ON":
-    for stdout_line in iter(popen.stdout.readline, ""):
-        print(stdout_line, end="")
 
-    for stdout_line in iter(popen.stderr.readline, ""):
-        print(stdout_line, end="", file=sys.stderr)
+for stdout_line in iter(popen.stdout.readline, ""):
+    if os.environ.get("PyPI_REQUIREMENTS_OUTPUT", "OFF").upper() == "ON": print(stdout_line, end="")
+
+for stdout_line in iter(popen.stderr.readline, ""):
+    if os.environ.get("PyPI_REQUIREMENTS_OUTPUT", "OFF").upper() == "ON": print(stdout_line, end="", file=sys.stderr)
     
 popen.stdout.close()
 
