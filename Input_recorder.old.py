@@ -1,6 +1,7 @@
 # -*- coding: cp1252 -*-
 
 # By Zuzu_Typ
+import requirements
 
 import ctypes
 import os

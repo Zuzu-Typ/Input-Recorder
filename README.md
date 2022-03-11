@@ -1,5 +1,7 @@
+[//]: # (generated using SlashBack 0.2.0)
+
 # Input Recorder  
-## Record and play back keyboard and mouse input  
+**Record and play back keyboard and mouse input**  
 A small **GUI\-application** that makes it easy to **record**, **play back** and share **keyboard and mouse** input in shape of a **macro**\.  
 Windows only\.  
   
@@ -9,5 +11,3 @@ Windows only\.
 3\. **Play back** recorded macros  
 4\. **Save and load** recorded macros  
 5\. **Restrict** recorded macros to be playable **once only**
-
-![Input Recorder](/screenshot.png?raw=true)

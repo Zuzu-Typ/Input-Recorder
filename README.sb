@@ -1,0 +1,11 @@
+\h1\Input Recorder\h1\
+\b\Record and play back keyboard and mouse input\b\
+A small \b\GUI-application\b\ that makes it easy to \b\record\b\, \b\play back\b\ and share \b\keyboard and mouse\b\ input in shape of a \b\macro\b\.
+Windows only.
+
+\h2\Features\h2\
+1. Record \b\mouse movement\b\ and \b\mouse buttons\b\
+2. Record \b\keyboard input\b\
+3. \b\Play back\b\ recorded macros
+4. \b\Save and load\b\ recorded macros
+5. \b\Restrict\b\ recorded macros to be playable \b\once only\b\
