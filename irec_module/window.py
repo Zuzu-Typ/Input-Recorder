@@ -1,6 +1,6 @@
 from . import config, macro, util
 
-import math, time, winput, re
+import math, time, winput, re, ctypes
 
 try:
     import tkinter
@@ -1378,6 +1378,8 @@ def record_macro_dialog():
 
 def create_window():
     global root, macro_list, macro_list_widget, unnamed_macro_index, style, selection
+
+    ctypes.windll.shcore.SetProcessDpiAwareness(2)
 
     selection = ()
 
