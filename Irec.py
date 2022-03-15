@@ -27,7 +27,10 @@ os.chdir(os.path.dirname(sys.argv[0]))
 try:
     import winput
     import PIL
-except ImportError:
+    
+    assert hasattr(winput, "set_DPI_aware")
+        
+except:
     import requirements
 
 
