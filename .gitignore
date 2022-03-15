@@ -4,6 +4,6 @@
 runreadmelang.bat
 readmelang.py
 README.rst
-
+config.dict
 build
 dist
