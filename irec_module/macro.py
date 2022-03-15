@@ -22,7 +22,7 @@ try:
 except ImportError:
     import config
 
-import winput, time, ctypes, zlib
+import winput, time, ctypes, zlib, json
 
 float_to_bytes = lambda f: bytes(ctypes.c_float(f))
 bytes_to_float = lambda b: ctypes.cast(b, ctypes.POINTER(ctypes.c_float)).contents.value
@@ -45,10 +45,38 @@ class MacroConfig:
         self.screen_width = screen_width
         self.screen_height = screen_height
 
+    def to_dict(self):
+        return {
+            "version"       : self.version,
+            "screen_width"  : self.screen_width,
+            "screen_height" : self.screen_height
+        }
+
+    def to_json(self):
+        return json.dumps()
+
     def to_bytes(self):
         data = self.version.to_bytes(1, "little") + self.screen_width.to_bytes(2, "little") + self.screen_height.to_bytes(2, "little")
 
         return len(data).to_bytes(1, "little") + data
+
+    @classmethod
+    def from_dict(cls, as_dict):
+        assert "version" in as_dict and \
+               "screen_width" in as_dict and \
+               "screen_height" in as_dict
+
+        assert as_dict["version"] == cls.version
+
+        assert type(as_dict["screen_width"]) == int and as_dict["screen_width"] > 0
+        assert type(as_dict["screen_height"]) == int and as_dict["screen_height"] > 0
+
+        return cls(as_dict["screen_width"], as_dict["screen_height"])
+
+    @classmethod
+    def from_json(cls, string):
+        return cls.from_dict(json.loads(string))
+
 
     @classmethod
     def from_bytes(cls, bytes_obj):
@@ -68,8 +96,23 @@ class MacroEvent:
     def to_bytes(self):
         raise NotImplementedError()
 
-    def from_bytes(self):
+    def to_dict(self):
         raise NotImplementedError()
+
+    def to_json(self):
+        return json.dumps(self.to_dict())
+
+    @classmethod
+    def from_bytes(cls):
+        raise NotImplementedError()
+
+    @classmethod
+    def from_dict(cls):
+        raise NotImplementedError()
+
+    @classmethod
+    def from_json(cls, config, string):
+        return cls.from_dict(config, json.loads(string))
 
 class MousePositionEvent(MacroEvent):
     bytecode = b"P"
@@ -90,6 +133,14 @@ class MousePositionEvent(MacroEvent):
     def execute(self):
         winput.set_mouse_pos(self.x, self.y)
 
+    def to_dict(self):
+        self.prepare()
+        return {
+            "type"  : self.__class__.__name__,
+            "x"     : self.x,
+            "y"     : self.y
+        }
+
     def to_bytes(self):
         self.prepare()
         return self.bytecode + self.x.to_bytes(2, "little", signed=True) + self.y.to_bytes(2, "little", signed=True)
@@ -99,6 +150,19 @@ class MousePositionEvent(MacroEvent):
         assert type(bytes_obj) == bytes and len(bytes_obj) == 5 and bytes_obj[0:1] == cls.bytecode
 
         return cls(config, int.from_bytes(bytes_obj[1:3], "little", signed=True), int.from_bytes(bytes_obj[3:], "little", signed=True))
+
+    @classmethod
+    def from_dict(cls, config, as_dict):
+        assert "type" in as_dict and \
+               "x" in as_dict and \
+               "y" in as_dict
+
+        assert as_dict["type"] == cls.__name__
+
+        assert type(as_dict["x"]) == int
+        assert type(as_dict["y"]) == int
+
+        return cls(config, as_dict["x"], as_dict["y"])
 
     def __str__(self):
         return "Set mouse position to ({:.2f}%, {:.2f}%)".format(self.rel_x * 100, self.rel_y * 100)
@@ -142,6 +206,12 @@ class MouseWheelEvent(MacroEvent):
     def prepare(self):
         pass
 
+    def to_dict(self):
+        return {
+            "type"  : self.__class__.__name__,
+            "amount": self.amount
+        }
+
     def to_bytes(self):
         return self.bytecode + self.amount.to_bytes(1, "little", signed=True)
 
@@ -150,6 +220,17 @@ class MouseWheelEvent(MacroEvent):
         assert type(bytes_obj) == bytes and len(bytes_obj) == 2 and bytes_obj[0:1] == cls.bytecode
 
         return cls(int.from_bytes(bytes_obj[1:], "little", signed=True))
+
+    @classmethod
+    def from_dict(cls, config, as_dict):
+        assert "type" in as_dict and \
+               "amount" in as_dict
+
+        assert as_dict["type"] == cls.__name__
+
+        assert type(as_dict["amount"]) == int
+
+        return cls(as_dict["amount"])
 
 class MouseWheelMoveEvent(MouseWheelEvent):
     bytecode = b"V"
@@ -179,6 +260,12 @@ class MouseButtonEvent(MacroEvent):
     def prepare(self):
         pass
 
+    def to_dict(self):
+        return {
+            "type"  : self.__class__.__name__,
+            "mouse_button": self.mouse_button
+        }
+
     def to_bytes(self):
         return self.bytecode + self.mouse_button.to_bytes(1, "little")
 
@@ -187,6 +274,17 @@ class MouseButtonEvent(MacroEvent):
         assert type(bytes_obj) == bytes and len(bytes_obj) == 2 and bytes_obj[0:1] == cls.bytecode
 
         return cls(int.from_bytes(bytes_obj[1:], "little"))
+
+    @classmethod
+    def from_dict(cls, config, as_dict):
+        assert "type" in as_dict and \
+               "mouse_button" in as_dict
+
+        assert as_dict["type"] == cls.__name__
+
+        assert type(as_dict["mouse_button"]) == int
+
+        return cls(as_dict["mouse_button"])
 
 class MouseButtonPressEvent(MouseButtonEvent):
     bytecode = b"B"
@@ -216,6 +314,12 @@ class KeyEvent(MacroEvent):
     def prepare(self):
         pass
 
+    def to_dict(self):
+        return {
+            "type"  : self.__class__.__name__,
+            "vk_code": self.vk_code
+        }
+
     def to_bytes(self):
         return self.bytecode + self.vk_code.to_bytes(2, "little")
 
@@ -224,6 +328,17 @@ class KeyEvent(MacroEvent):
         assert type(bytes_obj) == bytes and len(bytes_obj) == 3 and bytes_obj[0:1] == cls.bytecode
 
         return cls(int.from_bytes(bytes_obj[1:], "little"))
+
+    @classmethod
+    def from_dict(cls, config, as_dict):
+        assert "type" in as_dict and \
+               "vk_code" in as_dict
+
+        assert as_dict["type"] == cls.__name__
+
+        assert type(as_dict["vk_code"]) == int
+
+        return cls(as_dict["vk_code"])
 
 class KeyPressEvent(KeyEvent):
     bytecode = b"K"
@@ -268,6 +383,7 @@ class EventExecutor:
         self.event.prepare()
 
     def execute_at_time_offset(self, start_time):
+        global continue_playback, enable_playback_interruption
         now = perf_counter_ns()
 
         target_time = start_time + self.time_offset
@@ -280,10 +396,28 @@ class EventExecutor:
 
             else:
                 time.sleep(1 / 1000.)
+
+            if not continue_playback:
+                return
+
+            if enable_playback_interruption:
+                winput.get_message()
                 
             now = perf_counter_ns()
 
+        if not continue_playback:
+            return
+
         self.event.execute()
+
+    def to_dict(self):
+        return {
+            "time_offset"   : self.time_offset,
+            "event"         : self.event.to_dict()
+        }
+
+    def to_json(self):
+        return json.dumps(self.to_dict())
 
     def to_bytes(self):
         data = self.time_offset.to_bytes(8, "little") + self.event.to_bytes()
@@ -306,6 +440,31 @@ class EventExecutor:
 
         return cls(time_offset, event)
 
+    @classmethod
+    def from_dict(cls, config, as_dict):
+        assert "time_offset" in as_dict and \
+               "event" in as_dict
+
+        time_offset = as_dict["time_offset"]
+        event_dict = as_dict["event"]
+
+        assert type(time_offset) == int and time_offset >= 0
+
+        assert "type" in event_dict
+
+        glob = globals()
+
+        assert event_dict["type"] in glob, "Unknown event type: {}".format(event_dict["type"])
+
+        event_class = glob[event_dict["type"]]
+        event = event_class.from_dict(config, event_dict)
+
+        return cls(time_offset, event)
+
+    @classmethod
+    def from_json(cls, config, string):
+        return cls.from_dict(config, json.loads(string))
+
     def __str__(self):
         return "Executing {} at {}".format(str(self.event), self.time_offset)
 
@@ -315,13 +474,35 @@ class Macro:
         self.config = config
         self.event_executor_list = event_executor_list
 
+    def stop_playback_callback(self, key_event):
+        global continue_playback
+        
+        if key_event.vkCode == self.stop_playback_vk_code:
+            continue_playback = False
+
     def run(self):
+        global continue_playback, enable_playback_interruption
+        
         for executor in self.event_executor_list:
             executor.prepare()
+
+        continue_playback = True
+
+        enable_playback_interruption = config.get("enable_stop_playback_key", False)
+
+        if enable_playback_interruption:
+            self.stop_playback_vk_code = config.get("stop_playback_key", winput.VK_ESCAPE)
+            winput.hook_keyboard(self.stop_playback_callback)
             
         start_time = perf_counter_ns()
         for executor in self.event_executor_list:
             executor.execute_at_time_offset(start_time)
+
+            if not continue_playback:
+                break
+
+        if enable_playback_interruption:
+            winput.unhook_keyboard()
 
     def to_bytes(self):
         name_encoded = self.name.encode()
@@ -330,6 +511,42 @@ class Macro:
 
     def as_compressed_bytes(self):
         return zlib.compress(self.to_bytes(), 9)
+    
+    def to_dict(self):
+        return {
+            "name"   : self.name,
+            "config" : self.config.to_dict(),
+            "event_executor_list" : list(map(lambda x: x.to_dict(), self.event_executor_list))
+        }
+
+    def to_json(self):
+        return json.dumps(self.to_dict())
+
+    @classmethod
+    def from_dict(cls, as_dict):
+        assert "name" in as_dict and \
+               "config" in as_dict and \
+               "event_executor_list" in as_dict
+
+        name = as_dict["name"]
+
+        config_dict = as_dict["config"]
+
+        event_executor_dict_list = as_dict["event_executor_list"]
+
+        assert type(name) == str and \
+               type(config_dict) == dict and \
+               type(event_executor_dict_list) == list
+
+        config = MacroConfig.from_dict(config_dict)
+
+        event_executor_list = list(map(lambda x: EventExecutor.from_dict(config, x), event_executor_dict_list))
+
+        return cls(name, config, event_executor_list)
+
+    @classmethod
+    def from_json(cls, string):
+        return cls.from_dict(json.loads(string))
 
     @classmethod
     def from_bytes(cls, bytes_obj):
@@ -376,8 +593,6 @@ class Macro:
             event_executor_list.append(EventExecutor(0, MousePositionEvent(macro_config, start_mouse_pos[0], start_mouse_pos[1])))
 
         last_mouse_pos = start_mouse_pos
-
-        print(screen_width, screen_height)
 
         for timestamp, raw_event in raw_data:
             time_offset = timestamp - start_time
@@ -465,7 +680,7 @@ def callback_only_stop_key(event):
 def create_macro(name, start_at, screen_width, screen_height):
     global start, raw_data, stop_recording_key
 
-    mode = config.get("recording_mode", "timer")
+    mode = config.get("recording_mode", "key")
 
     duration = config.get("recording_duration", 10)
 
@@ -528,6 +743,20 @@ def create_macro(name, start_at, screen_width, screen_height):
     winput.unhook_keyboard()
 
     return Macro.from_raw_data(name, start, start_mouse_pos, screen_width, screen_height, raw_data)
+
+def macros_to_json(*macros, indent=None):
+    assert macros and all(map(lambda m: isinstance(m, Macro), macros))
+
+    macros_dict_list = list(map(lambda mcr: mcr.to_dict(), macros))
+
+    return json.dumps(macros_dict_list, indent=indent)
+
+def macros_from_json(string):
+    assert type(string) == str
+
+    macros_dict_list = json.loads(string)
+
+    return list(map(lambda md: Macro.from_dict(md), macros_dict_list))
 
 def macros_to_bytes(*macros, compressionlevel=9):
     assert macros and all(map(lambda m: isinstance(m, Macro), macros))

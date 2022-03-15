@@ -18,21 +18,17 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 
-import os
+import os, sys
 
 os.environ["PyPI_REQUIREMENTS_OUTPUT"] = "ON"
 
+os.chdir(os.path.dirname(sys.argv[0]))
+
 try:
     import winput
+    import PIL
 except ImportError:
     import requirements
-    import winput
-
-import zlib
-import time
-import sys
-
-import irec_module.config
 
 
 argv_short_to_long_dict = { "h" : "help", "?" : "help" }

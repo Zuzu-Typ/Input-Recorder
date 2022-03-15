@@ -1,10 +1,11 @@
 from . import config, macro, util
 
-import math, time, winput, re, ctypes
+import math, time, winput, re, ctypes, os
 
 try:
     import tkinter
     from tkinter import filedialog
+    from tkinter import messagebox
     from tkinter import ttk
 
 except ImportError: # Python 2
@@ -12,9 +13,18 @@ except ImportError: # Python 2
         import Tkinter as tkinter
         import ttk
         import tkFileDialog as filedialog
+        import tkMessageBox as messagebox
         
     except ImportError:
         raise ImportError("Tcl/Tk (tkinter) is not installed!")
+
+from PIL import Image, ImageTk
+
+IMAGE_FAST_SCALING_ALGORITHM = Image.NEAREST
+IMAGE_SCALING_ALGORITHM = Image.LANCZOS
+
+HAND_CURSOR = "@C:/Windows/Cursors/aero_link.cur" if os.path.exists("C:/Windows/Cursors/aero_link.cur") else None
+DEFAULT_CURSOR = ""
 
 class PlaceholderEntry(ttk.Entry):
     widget_id = 1
@@ -112,6 +122,36 @@ class PlaceholderEntry(ttk.Entry):
             
             self._placeholder = value
 
+class TooltipWindow:
+    def __init__(self, root, text, widget):
+        self.toplevel = tkinter.Toplevel(root)
+        self.toplevel.overrideredirect(True)
+        self.toplevel.wm_attributes('-topmost', True)
+        self.toplevel.wm_attributes('-alpha', 0.0)
+        self.toplevel.wm_attributes('-transparentcolor', "#ffffff")
+        self.label = tkinter.Label(self.toplevel, text=text, bg="#ffffff")
+        self.label.pack()
+
+        self.widget = widget
+
+    def prepare(self):
+        self.toplevel.update()
+        width = self.toplevel.winfo_width()
+        widget_width = self.widget.winfo_width()
+        widget_height = self.widget.winfo_height()
+
+        widget_x = self.widget.winfo_rootx()
+        widget_y = self.widget.winfo_rooty()
+
+        self.toplevel.geometry("+{}+{}".format(widget_x + widget_width // 2 - width // 2, widget_y + widget_height))
+
+    def show(self):
+        self.prepare()
+        self.toplevel.wm_attributes('-alpha', 1.0)
+
+    def hide(self):
+        self.toplevel.wm_attributes('-alpha', 0.0)
+
 class EventExecutorDelayListEntry:
     def __init__(self, delay, event_executor):
         self.delay = delay
@@ -135,6 +175,9 @@ class EventExecutorListEntry:
 
     def get_delay(self, previous_time_offset):
         return EventExecutorDelayListEntry(int(round((self.time_offset - previous_time_offset) / 1000000, 0)), self.event_executor)
+
+disable_button = lambda button: button.config(state=tkinter.DISABLED, cursor=DEFAULT_CURSOR)
+enable_button = lambda button: button.config(state=tkinter.NORMAL, cursor=HAND_CURSOR)
 
 def macro_to_list_entries(mcr):
     event_executors = mcr.event_executor_list
@@ -170,8 +213,23 @@ def update_macro_list_widget():
 
     macro_list_widget.focus_set()
 
+def autosave():
+    global macro_list, autosave_file_var
+
+    if autosave_file_var.get() and int(config.get("autosave", "0")):
+        file_ = open(autosave_file_var.get(), "wb")
+
+        file_ext = os.path.splitext(autosave_file_var.get())[1]
+
+        if file_ext.lower() == ".json":
+            file_.write(macro.macros_to_json(*macro_list, indent=4).encode())
+        else:
+            file_.write(macro.macros_to_bytes(*macro_list, compressionlevel=int(config.get("compression_level", "9"))))
+
+        file_.close()
+
 def start_countdown(macro_name, length):
-    global root, macro_list
+    global root, macro_list, upscale
 
     root.withdraw()
 
@@ -181,12 +239,16 @@ def start_countdown(macro_name, length):
 
     width, height = root.winfo_screenwidth(), root.winfo_screenheight()
 
+    root_width = root.winfo_width()
+
     if length:
         countdown_window = tkinter.Toplevel(root)
 
         countdown_window.overrideredirect(True)
 
-        countdown_window.geometry("{}x{}+{}+{}".format(500, 800, (width - 500) // 2, (height - 800) // 2))
+        w, h = upscale(500), upscale(800)
+
+        countdown_window.geometry("{}x{}+{}+{}".format(w, h, (width - w) // 2, (height - h) // 2))
 
         countdown_window.config(bg="#333334")
 
@@ -223,53 +285,60 @@ def start_countdown(macro_name, length):
 
     macro_list.append(macro.create_macro(macro_name, start_time, width, height))
 
+    autosave()
+
     update_macro_list_widget()
 
     root.deiconify()
 
 def save_macros_dialog():
-    global macro_list
-    
-    file_ = filedialog.asksaveasfile("wb", filetypes=[("Macro", "*.mcr"), ("All files", "*.*")], defaultextension="*.mcr")
-    
+    global macro_list, autosave_file_var
+
+    file_ = filedialog.asksaveasfile("wb", filetypes=[("Binary Macro", "*.mcr"), ("Human Readable Macro", "*.json"), ("All files", "*.*")], defaultextension="*.mcr")
+        
     if file_ is None:
         return
-    
-    file_.write(macro.macros_to_bytes(*macro_list, compressionlevel=int(config.get("compression_level", "9"))))
+
+    autosave_file_var.set(file_.name)
+
+    file_ext = os.path.splitext(file_.name)[1]
+
+    if file_ext.lower() == ".json":
+        file_.write(macro.macros_to_json(*macro_list, indent=4).encode())
+    else:
+        file_.write(macro.macros_to_bytes(*macro_list, compressionlevel=int(config.get("compression_level", "9"))))
+        
     file_.close()
 
 def load_macros_dialog():
-    global macro_list
+    global macro_list, autosave_file_var
 
-    file_ = filedialog.askopenfile("rb", filetypes=[("Macro", "*.mcr"), ("All files", "*.*")], defaultextension="*.mcr")
+    file_ = filedialog.askopenfile("rb", filetypes=[("Binary Macro", "*.mcr"), ("Human Readable Macro", "*.json"), ("All files", "*.*")], defaultextension="*.mcr")
     
     if file_ is None:
         return
-    
-    macro_list = macro.macros_from_bytes(file_.read())
+
+    autosave_file_var.set(file_.name)
+
+    file_ext = os.path.splitext(file_.name)[1]
+
+    if file_ext.lower() == ".json":
+        macro_list = macro.macros_from_json(file_.read().decode())
+    else:
+        macro_list = macro.macros_from_bytes(file_.read())
+        
     file_.close()
 
     update_macro_list_widget()
 
 def edit_macro_dialog(mcr):
-    global root, cursor_showing, current_edit_frame, current_selection, rebind
+    global root, cursor_showing, current_edit_frame, current_selection, rebind, upscale
 
     current_selection = None
 
     current_edit_frame = None
 
-##    options = {"keyboard" : tkinter.IntVar(value=int(config.get("record_keyboard", True))),
-##               "mouse": tkinter.IntVar(value=int(config.get("record_mouse", True))),
-##               "countdown" : tkinter.IntVar(value=int(config.get("countdown", 3))),
-##               "recording_stop_key" : config.get("recording_stop_key", winput.VK_ESCAPE),
-##               "recording_duration" : tkinter.StringVar(value=(config.get("recording_duration", 3))),
-##               "recording_mode" : tkinter.StringVar(value=config.get("recording_mode", "key"))}
-##
-##    options["keyboard"].trace("w", lambda *args: (config.set("record_keyboard", bool(options["keyboard"].get()))))
-##    options["mouse"].trace("w", lambda *args: (config.set("record_mouse", bool(options["mouse"].get()))))
-##    options["countdown"].trace("w", lambda *args: (config.set("countdown", int(options["countdown"].get()))))
-##    options["recording_duration"].trace("w", lambda *args: (config.set("recording_duration", float(options["recording_duration"].get()) if (options["recording_duration"].get()) else "0")))
-##    options["recording_mode"].trace("w", lambda *args: (config.set("recording_mode", (options["recording_mode"].get()))))
+    on_select_func = None
 
     root_x = root.winfo_x()
     root_y = root.winfo_y()
@@ -280,8 +349,8 @@ def edit_macro_dialog(mcr):
     screen_width = root.winfo_screenwidth()
     screen_height = root.winfo_screenheight()
 
-    window_width = root_width
-    window_height = root_height - 50
+    window_width = upscale(800)
+    window_height = upscale(550)
 
     window = tkinter.Toplevel(root)
     window.title("Edit")
@@ -291,9 +360,9 @@ def edit_macro_dialog(mcr):
 
     window.geometry("{}x{}+{}+{}".format(window_width, window_height, root_x + root_width // 2 - window_width // 2, root_y + root_height // 2 - window_height // 2))
 
-    CURSOR_SIZE = 21
+    CURSOR_SIZE = upscale(21)
 
-    CURSOR_WIDTH = 1
+    CURSOR_WIDTH = upscale(1)
 
     BORDER_SIZE = 2
     
@@ -340,7 +409,7 @@ def edit_macro_dialog(mcr):
     frame = tkinter.Frame(window)
     frame.place(relx=0.5, rely=0.5, anchor=tkinter.CENTER)
 
-    PADX = PADY = 5
+    PADX = PADY = upscale(5)
 
     list_entries = macro_to_list_entries(mcr)
 
@@ -358,7 +427,7 @@ def edit_macro_dialog(mcr):
 
     name_entry.insert(tkinter.END, mcr.name)
 
-    left_pane = tkinter.Frame(frame, height=window_height - 100)
+    left_pane = tkinter.Frame(frame, height=window_height - upscale(100))
     left_pane.grid(column=0, row=1, sticky=tkinter.N)
 
     left_label = tkinter.Label(left_pane, text="Insert")
@@ -366,7 +435,7 @@ def edit_macro_dialog(mcr):
 
     insert_var = tkinter.IntVar()
 
-    insert_var.set(0)
+    insert_var.set(1)
 
     insert_before_button = ttk.Radiobutton(left_pane, text="Before", value=0, variable=insert_var)
     insert_before_button.grid(column=0, row=1, sticky=tkinter.E, padx=PADX, pady=PADY)
@@ -395,12 +464,18 @@ def edit_macro_dialog(mcr):
         macro_list_widget.insert(current_selection - 1, list_entry.text)
         macro_list_widget.insert(current_selection - 1, delay_entry.text)
 
-        current_selection += 2
+##        current_selection += 2
 
         if not_list_entries:
             macro_list_widget.selection_set(0, 1)
 
             current_selection = 1
+
+        else:
+            current_selection
+            macro_list_widget.selection_clear(0, tkinter.END)
+            macro_list_widget.selection_set(current_selection, current_selection - 1)
+            macro_list_widget.activate(current_selection)
 
         macro_list_widget.focus_set()
 
@@ -427,6 +502,12 @@ def edit_macro_dialog(mcr):
             macro_list_widget.selection_set(0, 1)
             current_selection = 1
 
+        else:
+            current_selection += 2
+            macro_list_widget.selection_clear(0, tkinter.END)
+            macro_list_widget.selection_set(current_selection, current_selection - 1)
+            macro_list_widget.activate(current_selection)
+
         macro_list_widget.focus_set()
 
     def insert(event):
@@ -434,6 +515,8 @@ def edit_macro_dialog(mcr):
             insert_before(event)
         else:
             insert_after(event)
+
+        on_select_func()
 
     add_set_mouse_position = ttk.Button(left_pane, text="Set Mouse Position", command=lambda: insert(macro.MousePositionEvent(mcr.config, 0, 0)))
     add_set_mouse_position.grid(column=0, row=2, columnspan=2, sticky=tkinter.W + tkinter.E, padx=PADX, pady=PADY)
@@ -494,7 +577,7 @@ def edit_macro_dialog(mcr):
 
     
 
-    right_pane = tkinter.Frame(frame, height=window_height - 100)
+    right_pane = tkinter.Frame(frame, height=window_height - upscale(100))
     right_pane.grid(column=2, row=1, sticky=tkinter.N)
 
     right_label = tkinter.Label(right_pane, text="Edit")
@@ -877,7 +960,6 @@ def edit_macro_dialog(mcr):
         bound_id = {}
 
         def unbind_and_break(sym):
-            print(sym)
             macro_list_widget.unbind(sym)
             del bound_id[sym]
             return "break"
@@ -945,6 +1027,7 @@ def edit_macro_dialog(mcr):
         return string_to_vk_code("VK_" + text.replace(" ", "_").upper())
 
     def from_vk_code():
+        global upscale
         vk_code = string_to_vk_code(root.clipboard_get())
 
         if not vk_code:
@@ -953,8 +1036,8 @@ def edit_macro_dialog(mcr):
             vk_code_dialog = tkinter.Toplevel(window)
             vk_code_dialog.title("From VK-Code")
 
-            width = 250
-            height = 100
+            width = upscale(250)
+            height = upscale(100)
 
             vk_code_dialog.geometry("{}x{}+{}+{}".format(width, height, window.winfo_x() + (window.winfo_width() // 2 - width // 2), window.winfo_y() + (window.winfo_height() // 2 - height // 2)))
 
@@ -1125,7 +1208,7 @@ def edit_macro_dialog(mcr):
     button_save = ttk.Button(bottom_pane, text="Save", command=save)
     button_save.grid(column=1, row=0, padx=PADX, pady=PADY)
 
-    def on_select(e):
+    def on_select(*e):
         global cursor_showing, current_selection, current_edit_frame
 
         if not macro_list_widget.curselection():
@@ -1213,8 +1296,6 @@ def edit_macro_dialog(mcr):
             macro_list_widget.delete(current_selection - 1, current_selection)
 
             active = macro_list_widget.index(tkinter.ACTIVE)
-
-            print(active)
             
             if active < current_selection - 1:
                 current_selection = active
@@ -1238,6 +1319,8 @@ def edit_macro_dialog(mcr):
 
     rebind = rebind_func
 
+    on_select_func = on_select
+
     rebind()
 
     for list_entry in list_entries:
@@ -1254,7 +1337,7 @@ def edit_macro_dialog(mcr):
             break
 
 def record_macro_dialog():
-    global root
+    global root, upscale
 
     options = {"keyboard" : tkinter.IntVar(value=int(config.get("record_keyboard", True))),
                "mouse": tkinter.IntVar(value=int(config.get("record_mouse", True))),
@@ -1275,8 +1358,8 @@ def record_macro_dialog():
     root_width = root.winfo_width()
     root_height = root.winfo_height()
 
-    window_width = 400
-    window_height = 250
+    window_width = upscale(400)
+    window_height = upscale(250)
 
     window = tkinter.Toplevel(root)
     window.title("Record")
@@ -1289,7 +1372,7 @@ def record_macro_dialog():
     frame = tkinter.Frame(window)
     frame.place(relx=0.5, rely=0.5, anchor=tkinter.CENTER)
 
-    PADX = PADY = 5
+    PADX = PADY = upscale(5)
 
     macro_name_entry = PlaceholderEntry(frame, placeholder="Macro name")
     macro_name_entry.grid(column=0, columnspan=4, row=0, sticky=tkinter.W + tkinter.E, padx=PADX, pady=PADY)
@@ -1376,61 +1459,105 @@ def record_macro_dialog():
     else:
         button_stop_recording_key.config(state=tkinter.DISABLED)
 
-def create_window():
-    global root, macro_list, macro_list_widget, unnamed_macro_index, style, selection
+def create_tooltip_for_button(root, text, button):
+    button.ttw = TooltipWindow(root, text, button)
+    button.bind("<Enter>", lambda *args: button.ttw.show() if str(button.cget("state")) == tkinter.NORMAL else None)
+    button.bind("<Leave>", lambda *args: button.ttw.hide())
 
-    ctypes.windll.shcore.SetProcessDpiAwareness(2)
+def create_window():
+    global root, macro_list, macro_list_widget, unnamed_macro_index, style, selection, scaling_factor, upscale, autosave_file_var
+
+    winput.set_DPI_aware()
 
     selection = ()
 
     unnamed_macro_index = 1
 
     macro_list = []
+
+##    image_buttons = []
     
     root = tkinter.Tk()
+
+    autosave_file_var = tkinter.StringVar()
+
+    scaling_factor = winput.get_window_scaling_factor(root.winfo_id())
 
     root.title("Irec - Input Recorder")
 
     screen_width = root.winfo_screenwidth()
     screen_height = root.winfo_screenheight()
 
-    window_width = 800
-    window_height = 600
+    upscale = lambda n: int(round(n * scaling_factor, 0))
+
+    img_size = (upscale(40),upscale(40))
+
+    def create_fast_button_image(button, img_name):
+        button._pil_image = Image.open("res/{}".format(img_name))
+        button._pil_phimg = ImageTk.PhotoImage(button._pil_image.resize(img_size, IMAGE_SCALING_ALGORITHM))
+        button.config(image=button._pil_phimg)
+##        image_buttons.append(button)
+        button._pil_image.close()
+
+##    def create_quality_button_image(button):
+##        button._pil_phimg = ImageTk.PhotoImage(button._pil_image.resize(img_size, IMAGE_SCALING_ALGORITHM))
+##        button.config(image=button._pil_phimg)
+##        button._pil_image.close()
+
+    window_width = upscale(800)
+    window_height = upscale(600)
 
     window_x = config.get("window_x", screen_width // 2 - window_width // 2)
     window_y = config.get("window_y", screen_height // 2 - window_height // 2)
 
     root.geometry("{}x{}+{}+{}".format(window_width, window_height, window_x, window_y))
 
-    try: root.iconbitmap('Irec.ico')
+    try: root.iconbitmap('res/Irec.ico')
     except: pass
 
     root.protocol("WM_DELETE_WINDOW", lambda: (config.set("window_x", root.winfo_x()), config.set("window_y", root.winfo_y()), root.destroy()))
 
-    IPADX = 5
-    IPADY = 10
+    IPADX = upscale(5)
+    IPADY = upscale(10)
+
+    PADX = PADY = upscale(10)
 
     frame = tkinter.Frame(root)
     frame.place(relx=0.5, rely=0.5, anchor=tkinter.CENTER)
 
     macro_list_widget = tkinter.Listbox(frame, width=30, height=30)
-    macro_list_widget.grid(column=0, row=0, rowspan=4, padx=50, pady=10)
+    macro_list_widget.grid(column=0, row=0, rowspan=4, padx=upscale(50), pady=upscale(10))
 
-    record_macro_button = ttk.Button(frame, text="Record macro", command=record_macro_dialog)
-    record_macro_button.grid(column=1, row=0, padx=10, pady=10, ipadx=IPADX, ipady=IPADY)
+    toolbar_frame = tkinter.Frame(frame)
+    toolbar_frame.grid(column=1, row=0, columnspan=4)
+
+    record_macro_button = ttk.Button(toolbar_frame, command=record_macro_dialog, cursor=HAND_CURSOR)#ttk.Button(frame, text="Record macro", command=record_macro_dialog)
+    record_macro_button.grid(column=0, row=0, padx=PADX * 2, pady=PADY)#, ipadx=IPADX, ipady=IPADY)
+
+    create_fast_button_image(record_macro_button, "rec.png")
+
+    create_tooltip_for_button(root, "Record a macro", record_macro_button)
 
     def create_macro():
         global selection
         mcr = macro.Macro("Unnamed Macro {}".format(len(macro_list)), macro.MacroConfig(screen_width, screen_height), [])
         edit_macro_dialog(mcr)
-        macro_list.append(mcr)
-        new_index = macro_list_widget.size()
-        macro_list_widget.insert(tkinter.END, mcr.name)
-        selection = (new_index,)
+        
+        if mcr.event_executor_list:
+            macro_list.append(mcr)
+            new_index = macro_list_widget.size()
+            macro_list_widget.insert(tkinter.END, mcr.name)
+            selection = (new_index,)
+            autosave()
+            
         macro_list_widget.focus_set()
 
-    create_macro_button = ttk.Button(frame, text="Create macro", command=create_macro)
-    create_macro_button.grid(column=2, row=0, padx=10, pady=10, ipadx=IPADX, ipady=IPADY)
+    create_macro_button = ttk.Button(toolbar_frame, command=create_macro, cursor=HAND_CURSOR)#ttk.Button(frame, text="Create macro", command=create_macro)
+    create_macro_button.grid(column=1, row=0, padx=PADX * 2, pady=PADY)#, ipadx=IPADX, ipady=IPADY)
+
+    create_fast_button_image(create_macro_button, "add.png")
+
+    create_tooltip_for_button(root, "Create a macro", create_macro_button)
 
     def edit_macro():
         selection = macro_list_widget.curselection()
@@ -1439,19 +1566,40 @@ def create_window():
             edit_macro_dialog(mcr)
             macro_list_widget.delete(selection[0])
             macro_list_widget.insert(selection[0], mcr.name)
+            autosave()
         macro_list_widget.focus_set()
 
-    edit_macro_button = ttk.Button(frame, text="Edit macro", command=edit_macro, state=tkinter.DISABLED)
-    edit_macro_button.grid(column=1, row=1, columnspan=2, padx=10, pady=10, ipadx=IPADX, ipady=IPADY)
+    edit_macro_button = ttk.Button(toolbar_frame, command=edit_macro)#ttk.Button(frame, text="Edit macro", command=edit_macro, state=tkinter.DISABLED)
+    edit_macro_button.grid(column=2, row=0, padx=PADX * 2, pady=PADY)#, ipadx=IPADX, ipady=IPADY)
+
+    disable_button(edit_macro_button)
+
+    create_fast_button_image(edit_macro_button, "edit.png")
+
+    create_tooltip_for_button(root, "Edit the selected macro", edit_macro_button)
+
+    delete_macro_button = ttk.Button(toolbar_frame)#ttk.Button(frame, text="Delete macro", state=tkinter.DISABLED)
+    delete_macro_button.grid(column=3, row=0, padx=PADX * 2, pady=PADY)#, ipadx=IPADX, ipady=IPADY)
+
+    disable_button(delete_macro_button)
+
+    create_fast_button_image(delete_macro_button, "delete.png")
+
+    create_tooltip_for_button(root, "Delete the selected macro", delete_macro_button)
 
     play_area = ttk.LabelFrame(frame, text="Play")
-    play_area.grid(column=1, row=2, columnspan=2)
+    play_area.grid(column=1, row=2, columnspan=2, sticky=tkinter.N, padx=PADX, pady=PADY)
 
     repeat_label = tkinter.Label(play_area, text="Repeat:")
-    repeat_label.grid(column=0, row=0, padx=10, pady=10)
+    repeat_label.grid(column=0, row=0, padx=PADX, pady=PADY)
 
     repeat_var = tkinter.StringVar()
     compression_level_var = tkinter.StringVar()
+    autosave_var = tkinter.IntVar()
+    stop_playback_enabled_var = tkinter.IntVar()
+
+    autosave_var.set(config.get("autosave", 0))
+    stop_playback_enabled_var.set(int(config.get("enable_stop_playback_key", False)))
 
     def validate_repeat(text):
         if text == "":
@@ -1471,14 +1619,60 @@ def create_window():
     registered_validate_repeat = root.register(validate_repeat)
 
     repeat_spinbox = ttk.Spinbox(play_area, from_=0, to=9999, width=4, textvariable=repeat_var, validate="all", validatecommand=(registered_validate_repeat, "%P"))
-    repeat_spinbox.grid(column=1, row=0, padx=10, pady=10)
+    repeat_spinbox.grid(column=1, row=0, padx=PADX, pady=PADY)
 
     repeat_var.set("0")
 
-    def play_macro():
+    enable_stop_playback_key_checkbutton = ttk.Checkbutton(play_area, text="Enable stop playback key", variable=stop_playback_enabled_var, cursor=HAND_CURSOR)
+    enable_stop_playback_key_checkbutton.grid(column=0, row=1, columnspan=2, padx=PADX, pady=PADY)
+
+    stop_playback_key_label = tkinter.Label(play_area, text="Stop key:")
+    stop_playback_key_label.grid(column=0, row=2, padx=PADX, pady=PADY)
+
+    stop_playback_key = ttk.Button(play_area, text=util.vk_code_to_key_name(config.get("stop_playback_key", winput.VK_ESCAPE)), cursor=HAND_CURSOR)
+    stop_playback_key.grid(column=1, row=2, padx=PADX, pady=PADY)
+
+    def toggle_stop_playback_enabled(*args):
+        enabled = bool(stop_playback_enabled_var.get())
+        config.set("enable_stop_playback_key", enabled)
+        if enabled:
+            enable_button(stop_playback_key)
+        else:
+            disable_button(stop_playback_key)
+
+        macro_list_widget.focus_set()
+
+    stop_playback_enabled_var.trace("w", toggle_stop_playback_enabled)
+    
+    stop_playback_enabled_var.set(int(config.get("enable_stop_playback_key", False)))
+
+    def get_new_stop_playback_key():
+        stop_playback_key.config(text="Press a Key...")
+        disable_button(stop_playback_key)
+        
+        root.update()
+
+        requested_key = macro.request_key(5)
+
+        if requested_key:
+            config.set("stop_playback_key", requested_key)
+
+        stop_playback_key.config(text=util.vk_code_to_key_name(config.get("stop_playback_key", winput.VK_ESCAPE)))
+
+        enable_button(stop_playback_key)
+
+        macro_list_widget.focus_set()
+
+    stop_playback_key.config(command=get_new_stop_playback_key)
+
+    play_macro_button = ttk.Button(play_area)#ttk.Button(play_area, text="Play macro", command=play_macro, state=tkinter.DISABLED)
+    disable_button(play_macro_button)
+
+    def play_macro(*e):
         global selection
         if selection:
             root.withdraw()
+            play_macro_button.ttw.hide()
             root.update()
             
             macro = macro_list[macro_list_widget.curselection()[0]]
@@ -1491,12 +1685,18 @@ def create_window():
                 
             root.deiconify()
             root.update()
+            
+        macro_list_widget.focus_set()
 
-    play_macro_button = ttk.Button(play_area, text="Play macro", command=play_macro, state=tkinter.DISABLED)
-    play_macro_button.grid(column=0, row=1, columnspan=2, padx=10, pady=10, ipadx=IPADX, ipady=IPADY)
+    play_macro_button.config(command=play_macro)
+    play_macro_button.grid(column=0, row=3, columnspan=2, padx=PADX, pady=PADY)#, ipadx=IPADX, ipady=IPADY)
+
+    create_fast_button_image(play_macro_button, "play.png")
+
+    create_tooltip_for_button(root, "Play the selected macro", play_macro_button)
 
     save_area = ttk.LabelFrame(frame, text="Save and Load")
-    save_area.grid(column=1, row=3, columnspan=2)
+    save_area.grid(column=3, row=2, columnspan=2, sticky=tkinter.N, padx=PADX, pady=PADY)
 
     def validate_compression_level(text):
         if text == "":
@@ -1516,50 +1716,112 @@ def create_window():
     registered_validate_compression_level = root.register(validate_compression_level)
 
     compression_level_label = tkinter.Label(save_area, text="Compression level:")
-    compression_level_label.grid(column=0, row=0, padx=10, pady=10, sticky=tkinter.E)
+    compression_level_label.grid(column=0, row=0, padx=PADX, pady=PADY, sticky=tkinter.E)
 
     compression_level_spinbox = ttk.Spinbox(save_area, from_=0, to=9, width=2, textvariable=compression_level_var, validate="all", validatecommand=(registered_validate_compression_level, "%P"))
-    compression_level_spinbox.grid(column=1, row=0, padx=10, pady=10, sticky=tkinter.W)
+    compression_level_spinbox.grid(column=1, row=0, padx=PADX, pady=PADY, sticky=tkinter.W)
 
     compression_level_var.set(config.get("compression_level", "9"))
 
     compression_level_var.trace("w", lambda *args: config.set("compression_level", compression_level_var.get()))
 
-    save_macros_button = ttk.Button(save_area, text="Save macros", command=save_macros_dialog)
-    save_macros_button.grid(column=0, row=1, padx=10, pady=10, ipadx=IPADX, ipady=IPADY)
+    autosave_checkbutton = ttk.Checkbutton(save_area, text="Autosave", variable=autosave_var, command=macro_list_widget.focus_set)
+    autosave_checkbutton.grid(column=0, row=1, columnspan=2, padx=PADX, pady=PADY)
 
-    load_macros_button = ttk.Button(save_area, text="Load macros", command=load_macros_dialog)
-    load_macros_button.grid(column=1, row=1, padx=10, pady=10, ipadx=IPADX, ipady=IPADY)
+    disable_button(autosave_checkbutton)
+
+    autosave_var.trace("w", lambda *args: config.set("autosave", autosave_var.get()))
+
+    autosave_file_var.trace("w", lambda *args: enable_button(autosave_checkbutton) if autosave_file_var.get() else disable_button(autosave_checkbutton))
+
+    save_load_frame = tkinter.Frame(save_area)
+    save_load_frame.grid(column=0, row=2, columnspan=2, padx=PADX, pady=PADY)
+
+    save_macros_button = ttk.Button(save_load_frame, command=save_macros_dialog)#ttk.Button(save_area, text="Save macros", command=save_macros_dialog, state=tkinter.DISABLED)
+    save_macros_button.grid(column=0, row=0, padx=PADX, pady=PADY)#, ipadx=IPADX, ipady=IPADY)
+
+    disable_button(save_macros_button)
+
+    create_fast_button_image(save_macros_button, "save.png")
+
+    create_tooltip_for_button(root, "Save all macros as a file", save_macros_button)
+
+    load_macros_button = ttk.Button(save_load_frame, command=load_macros_dialog, cursor=HAND_CURSOR)#ttk.Button(save_area, text="Load macros", command=load_macros_dialog)
+    load_macros_button.grid(column=1, row=0, padx=PADX, pady=PADY)#, ipadx=IPADX, ipady=IPADY)
+
+    create_fast_button_image(load_macros_button, "load.png")
+
+    create_tooltip_for_button(root, "Load macros from a file", load_macros_button)
 
     def export_macro():
         global selection, macro_list       
 
         if selection:
-            file_ = filedialog.asksaveasfile("wb", filetypes=[("Macro", "*.mcr"), ("All files", "*.*")], defaultextension="*.mcr")
+            file_ = filedialog.asksaveasfile("wb", filetypes=[("Binary Macro", "*.mcr"), ("Human Readable Macro", "*.json"), ("All files", "*.*")], defaultextension="*.mcr")
         
             if file_ is None:
                 return
-            
-            file_.write(macro.macros_to_bytes(macro_list[selection[0]], compressionlevel=int(config.get("compression_level", "9"))))
+
+            file_ext = os.path.splitext(file_.name)[1]
+
+            if file_ext.lower() == ".json":
+                file_.write(macro.macros_to_json(macro_list[selection[0]], indent=4))
+            else:
+                file_.write(macro.macros_to_bytes(macro_list[selection[0]], compressionlevel=int(config.get("compression_level", "9"))))
+                
             file_.close()
 
-    export_macro_button = ttk.Button(save_area, text="Export macro", state=tkinter.DISABLED, command=export_macro)
-    export_macro_button.grid(column=0, row=2, columnspan=2, padx=10, pady=10, ipadx=IPADX, ipady=IPADY)
+    export_macro_button = ttk.Button(save_area, text="Export macro", command=export_macro)
+    export_macro_button.grid(column=0, row=3, columnspan=2, padx=PADX, pady=PADY, ipadx=IPADX, ipady=IPADY)
+
+    disable_button(export_macro_button)
+
+    def import_macros():
+        global macro_list
+        
+        file_ = filedialog.askopenfile("rb", filetypes=[("Binary Macro", "*.mcr"), ("Human Readable Macro", "*.json"), ("All files", "*.*")], defaultextension="*.mcr")
+
+        if file_ is None:
+            pass
+
+        file_ext = os.path.splitext(file_.name)[1]
+
+        imported_macro_list = None
+
+        if file_ext.lower() == ".json":
+            imported_macro_list = macro.macros_from_json(file_.read().decode())
+        else:
+            imported_macro_list = macro.macros_from_bytes(file_.read())
+
+        macro_list.extend(imported_macro_list)
+            
+        file_.close()
+
+        update_macro_list_widget()
+
+    import_macros_button = ttk.Button(save_area, text="Import macros", command=import_macros, cursor=HAND_CURSOR)
+    import_macros_button.grid(column=0, row=4, columnspan=2, padx=PADX, pady=PADY, ipadx=IPADX, ipady=IPADY)
 
     def on_select(*e):
-        global selection
+        global selection, macro_list
         new_selection = macro_list_widget.curselection()
 
         if new_selection:
             selection = new_selection
-            
-            play_macro_button.config(state=tkinter.NORMAL)
-            edit_macro_button.config(state=tkinter.NORMAL)
-            export_macro_button.config(state=tkinter.NORMAL)
+
+            enable_button(play_macro_button)
+            enable_button(edit_macro_button)
+            enable_button(export_macro_button)
+            enable_button(delete_macro_button)
+            enable_button(save_macros_button)
         else:
-            play_macro_button.config(state=tkinter.DISABLED)
-            edit_macro_button.config(state=tkinter.DISABLED)
-            export_macro_button.config(state=tkinter.DISABLED)
+            disable_button(play_macro_button)
+            disable_button(edit_macro_button)
+            disable_button(export_macro_button)
+            disable_button(delete_macro_button)
+
+            if not macro_list:
+                disable_button(save_macros_button)
 
     def do_select(*e):
         global selection
@@ -1571,11 +1833,37 @@ def create_window():
 
         on_select()
 
+    def delete(*e):
+        global selection, macro_list
+
+        if selection and messagebox.askyesno("Delete macro?", "Are you sure you want to delete '{}'".format(macro_list[selection[0]].name)):
+            del macro_list[selection[0]]
+            macro_list_widget.delete(selection[0])
+
+            if not macro_list:
+                selection = None
+
+            elif selection[0] == len(macro_list):
+                selection = (selection[0] - 1,)
+
+            autosave()
+
+            do_select()
+            
+        macro_list_widget.focus_set()
+
+    delete_macro_button.config(command=delete)
+
     macro_list_widget.bind("<<ListboxSelect>>", on_select)
     macro_list_widget.bind("<FocusOut>", on_select)
     macro_list_widget.bind("<FocusIn>", do_select)
+    macro_list_widget.bind("<Delete>", delete)
+    macro_list_widget.bind("<Return>", play_macro)
 
-    
+    root.update()
+
+##    for button in image_buttons:
+##        create_quality_button_image(button)
 
     root.mainloop()
 

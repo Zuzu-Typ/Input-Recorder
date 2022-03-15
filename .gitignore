@@ -1,5 +1,6 @@
 
 *.pyc
+*.xcf
 runreadmelang.bat
 readmelang.py
 README.rst
