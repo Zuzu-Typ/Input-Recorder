@@ -34,6 +34,7 @@ extern const char* LICENSE_TEXT;
 const char* HELP_STRING = "Usage: MacroPlayer [OPTIONS] FILE\n"
                           "\n"
                           "Plays back the macro found in FILE.\n"
+                          "Only single binary macros (*.mcr) are supported.\n"
                           "\n"
                           " Option          Alias     Description\n"
                           " --help          -h        Print this usage guide.\n"
@@ -163,6 +164,11 @@ int main(int argc, char** argv)
 
         if (error) {
             std::cout << FILE_ERROR_STRING << std::endl;
+            return -1;
+        }
+
+        if (data_length < 4) {
+            std::cout << ZLIB_ERROR_STRING << std::endl;
             return -1;
         }
 

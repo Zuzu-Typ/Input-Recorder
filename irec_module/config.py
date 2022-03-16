@@ -17,7 +17,7 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 
-import os, atexit
+import os, atexit, json
 
 CONFIG_FILE = "config.dict"
 
@@ -28,10 +28,10 @@ if os.path.exists(CONFIG_FILE):
     content = __file.read().strip()
     __file.close()
 
-    if not (content.startswith("{") and content.endswith("}") and not ";" in content):
+    if not (content.startswith("{") and content.endswith("}")):
         raise Exception("Invalid config file!")
 
-    __config = eval(content)
+    __config = json.loads(content)
 
 def get(key, default = None):
     global __config
@@ -45,7 +45,7 @@ def __save():
     global __config
     
     __file = open(CONFIG_FILE, "w", encoding="UTF8")
-    __file.write(repr(__config))
+    __file.write(json.dumps(__config))
     __file.close()
 
 atexit.register(__save)

@@ -172,8 +172,12 @@ int play_macro(unsigned int byte_count, byte* bytes, PlaybackMode mode) {
 
 	unsigned int index = 0;
 
-	if (bytes[index++] != (byte)'S') {
+	if (bytes[index] == (byte)'M') {
 		return MACRO_NON_SINGLE;
+	}
+
+	if (bytes[index++] != (byte)'S') {
+		return MACRO_INVALID_FORMAT;
 	}
 
 	if (index == byte_count) {

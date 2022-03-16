@@ -34,7 +34,7 @@
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <Image Include="..\Irec.ico">
+    <Image Include="..\res\Irec.ico">
       <Filter>Ressourcendateien</Filter>
     </Image>
   </ItemGroup>

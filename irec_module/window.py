@@ -1351,8 +1351,26 @@ def record_macro_dialog():
                "recording_duration" : tkinter.StringVar(value=(config.get("recording_duration", 3))),
                "recording_mode" : tkinter.StringVar(value=config.get("recording_mode", "key"))}
 
-    options["keyboard"].trace("w", lambda *args: (config.set("record_keyboard", bool(options["keyboard"].get()))))
-    options["mouse"].trace("w", lambda *args: (config.set("record_mouse", bool(options["mouse"].get()))))
+    def mouse_var_trace(*args):
+        record_mouse = bool(options["mouse"].get())
+        record_keyboard = bool(options["keyboard"].get())
+
+        if not record_mouse and not record_keyboard:
+            options["keyboard"].set(1)
+            
+        config.set("record_mouse", record_mouse)
+
+    def keyboard_var_trace(*args):
+        record_mouse = bool(options["mouse"].get())
+        record_keyboard = bool(options["keyboard"].get())
+
+        if not record_mouse and not record_keyboard:
+            options["mouse"].set(1)
+            
+        config.set("record_keyboard", record_mouse)
+
+    options["keyboard"].trace("w", keyboard_var_trace)
+    options["mouse"].trace("w", mouse_var_trace)
     options["countdown"].trace("w", lambda *args: (config.set("countdown", int(options["countdown"].get()))))
     options["recording_duration"].trace("w", lambda *args: (config.set("recording_duration", float(options["recording_duration"].get()) if (options["recording_duration"].get()) else "0")))
     options["recording_mode"].trace("w", lambda *args: (config.set("recording_mode", (options["recording_mode"].get()))))
@@ -1777,7 +1795,7 @@ def create_window():
             file_.close()
 
     export_macro_button = ttk.Button(save_area, text="Export macro", command=export_macro)
-    export_macro_button.grid(column=0, row=3, columnspan=2, padx=PADX, pady=PADY, ipadx=IPADX, ipady=IPADY)
+    export_macro_button.grid(column=0, row=3, columnspan=2, padx=PADX, pady=PADY, ipadx=IPADX, ipady=IPADY, sticky=tkinter.E + tkinter.W)
 
     disable_button(export_macro_button)
 
@@ -1805,7 +1823,7 @@ def create_window():
         update_macro_list_widget()
 
     import_macros_button = ttk.Button(save_area, text="Import macros", command=import_macros, cursor=HAND_CURSOR)
-    import_macros_button.grid(column=0, row=4, columnspan=2, padx=PADX, pady=PADY, ipadx=IPADX, ipady=IPADY)
+    import_macros_button.grid(column=0, row=4, columnspan=2, padx=PADX, pady=PADY, ipadx=IPADX, ipady=IPADY, sticky=tkinter.E + tkinter.W)
 
     def on_select(*e):
         global selection, macro_list
