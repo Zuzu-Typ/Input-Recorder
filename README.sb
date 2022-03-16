@@ -1,0 +1,40 @@
+\h1\Irec - Input Recorder and Macro Suite\h1\
+\b\Record your keyboard and mouse inputs, store them as a macro and play them back at any time!\b\
+
+\image screenshots/main-menu.png \\image\
+
+\b\Windows only.\b\
+\b\Python 3.8 or greater recommended.\b\
+
+\h2\Features\h2\
+\ul\
+\-\\b\Record inputs\b\ as macros
+\--\\b\Mouse inputs\b\
+\---\\b\Cursor\b\ movement
+\---\\b\Mousewheel movement\b\ (vertical and horizontal)
+\---\\b\Mouse button\b\ events (Left, Middle, Right, X1, X2)
+\--\\b\Keyboard inputs\b\
+\---\\b\Key\b\ events
+\-\\b\Play back macros\b\
+\--\Once or \b\repeatedly\b\
+\--\\b\Stop playback\b\ by pressing a keyboard key
+\--\Two playback options
+\---\From the \b\GUI applicaion\b\
+\---\Using a \b\dedicated player application\b\ (\code\MacroPlayer.exe\code\)
+\-\\b\Edit macros\b\
+\--\\b\Add inputs\b\ to macros
+\--\\b\Remove inputs\b\ from macros
+\--\\b\Change inputs\b\
+\--\\b\Change delays\b\ between inputs
+\-\\b\Create macros\b\
+\-\\b\Save and load macros\b\
+\--\In \b\binary\b\ format
+\--\In \b\JSON\b\ format
+\-\\b\Automatically save macros\b\
+\-\Irec is \b\Free Software\b\ (GNU General Public License 3.0)
+\ul\
+
+
+\h2\Screenshots\h2\
+\image screenshots/record-dialog.png \\image\
+\image screenshots/edit-dialog.png \\image\

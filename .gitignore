@@ -1,5 +1,10 @@
 
 *.pyc
+*.xcf
 runreadmelang.bat
 readmelang.py
 README.rst
+config.dict
+build
+dist
+source_images

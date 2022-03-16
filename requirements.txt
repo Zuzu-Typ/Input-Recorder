@@ -1,0 +1,2 @@
+winput>=1.4.0
+Pillow
