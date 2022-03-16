@@ -1770,7 +1770,7 @@ def create_window():
             file_ext = os.path.splitext(file_.name)[1]
 
             if file_ext.lower() == ".json":
-                file_.write(macro.macros_to_json(macro_list[selection[0]], indent=4))
+                file_.write(macro.macros_to_json(macro_list[selection[0]], indent=4).encode())
             else:
                 file_.write(macro.macros_to_bytes(macro_list[selection[0]], compressionlevel=int(config.get("compression_level", "9"))))
                 

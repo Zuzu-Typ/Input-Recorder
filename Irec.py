@@ -22,9 +22,13 @@ import os, sys
 
 os.environ["PyPI_REQUIREMENTS_OUTPUT"] = "ON"
 
-os.chdir(os.path.dirname(sys.argv[0]))
+os.chdir(os.path.dirname(os.path.realpath(sys.argv[0])))
 
-import requirements
+try:
+    import requirements
+    
+except IOError:
+    print("Failed to load requirements.", file=sys.stderr)
 
 try:
     import winput

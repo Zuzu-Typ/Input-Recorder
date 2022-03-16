@@ -20,7 +20,10 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 import winput, re
 
 def vk_code_to_key_name(vk_code):
-    name = winput.vk_code_dict.get(vk_code, "VK_UNKNOWN").removeprefix("VK_")
+    name = winput.vk_code_dict.get(vk_code, "VK_UNKNOWN")
+
+    if name.startswith("VK_"):
+        name = name[3:]
     
     special_left_key_match = re.match("L(CONTROL|MENU|WIN|SHIFT)", name)
 
