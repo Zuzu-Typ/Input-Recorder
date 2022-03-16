@@ -1028,7 +1028,12 @@ def edit_macro_dialog(mcr):
 
     def from_vk_code():
         global upscale
-        vk_code = string_to_vk_code(root.clipboard_get())
+        vk_code = None
+
+        try:
+            vk_code = string_to_vk_code(root.clipboard_get())
+        except:
+            pass
 
         if not vk_code:
             dialog_return = tkinter.StringVar()
@@ -1531,10 +1536,10 @@ def create_window():
     toolbar_frame = tkinter.Frame(frame)
     toolbar_frame.grid(column=1, row=0, columnspan=4)
 
-    record_macro_button = ttk.Button(toolbar_frame, command=record_macro_dialog, cursor=HAND_CURSOR)#ttk.Button(frame, text="Record macro", command=record_macro_dialog)
+    record_macro_button = ttk.Button(toolbar_frame, command=record_macro_dialog, takefocus=False, cursor=HAND_CURSOR)#ttk.Button(frame, text="Record macro", command=record_macro_dialog)
     record_macro_button.grid(column=0, row=0, padx=PADX * 2, pady=PADY)#, ipadx=IPADX, ipady=IPADY)
 
-    create_fast_button_image(record_macro_button, "rec.png")
+    create_fast_button_image(record_macro_button, "rec2.png")
 
     create_tooltip_for_button(root, "Record a macro", record_macro_button)
 
@@ -1555,7 +1560,7 @@ def create_window():
     create_macro_button = ttk.Button(toolbar_frame, command=create_macro, cursor=HAND_CURSOR)#ttk.Button(frame, text="Create macro", command=create_macro)
     create_macro_button.grid(column=1, row=0, padx=PADX * 2, pady=PADY)#, ipadx=IPADX, ipady=IPADY)
 
-    create_fast_button_image(create_macro_button, "add.png")
+    create_fast_button_image(create_macro_button, "add2.png")
 
     create_tooltip_for_button(root, "Create a macro", create_macro_button)
 
@@ -1574,7 +1579,7 @@ def create_window():
 
     disable_button(edit_macro_button)
 
-    create_fast_button_image(edit_macro_button, "edit.png")
+    create_fast_button_image(edit_macro_button, "edit2.png")
 
     create_tooltip_for_button(root, "Edit the selected macro", edit_macro_button)
 
@@ -1583,7 +1588,7 @@ def create_window():
 
     disable_button(delete_macro_button)
 
-    create_fast_button_image(delete_macro_button, "delete.png")
+    create_fast_button_image(delete_macro_button, "delete2.png")
 
     create_tooltip_for_button(root, "Delete the selected macro", delete_macro_button)
 
@@ -1691,7 +1696,7 @@ def create_window():
     play_macro_button.config(command=play_macro)
     play_macro_button.grid(column=0, row=3, columnspan=2, padx=PADX, pady=PADY)#, ipadx=IPADX, ipady=IPADY)
 
-    create_fast_button_image(play_macro_button, "play.png")
+    create_fast_button_image(play_macro_button, "play2.png")
 
     create_tooltip_for_button(root, "Play the selected macro", play_macro_button)
 

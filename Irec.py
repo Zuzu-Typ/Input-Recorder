@@ -24,6 +24,8 @@ os.environ["PyPI_REQUIREMENTS_OUTPUT"] = "ON"
 
 os.chdir(os.path.dirname(sys.argv[0]))
 
+import requirements
+
 try:
     import winput
     import PIL
@@ -31,7 +33,7 @@ try:
     assert hasattr(winput, "set_DPI_aware")
         
 except:
-    import requirements
+    sys.exit(-1)
 
 
 argv_short_to_long_dict = { "h" : "help", "?" : "help" }
