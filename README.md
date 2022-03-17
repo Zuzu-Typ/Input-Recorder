@@ -39,4 +39,4 @@
   
 ## Screenshots  
 ![](screenshots/record-dialog.png)  
-![](screenshots/edit-dialog.png)
+![](screenshots/edit-dialog.gif)
