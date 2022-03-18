@@ -25,7 +25,7 @@ os.environ["PyPI_REQUIREMENTS_OUTPUT"] = "ON"
 os.chdir(os.path.dirname(os.path.realpath(sys.argv[0])))
 
 try:
-    import requirements
+    from requirements import requirements
     
 except IOError:
     print("Failed to load requirements.", file=sys.stderr)

@@ -1,3 +1,6 @@
 [submodule "zlib"]
 	path = zlib
 	url = https://github.com/madler/zlib
+[submodule "requirements"]
+	path = requirements
+	url = https://github.com/Zuzu-Typ/requirements
