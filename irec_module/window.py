@@ -1,3 +1,22 @@
+
+"""
+Input Recorder - Record and play back keyboard and mouse input.
+Copyright (C) 2022  Zuzu_Typ
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <https://www.gnu.org/licenses/>.
+"""
+
 from . import config, macro, util
 
 import math, time, winput, re, ctypes, os
@@ -8,15 +27,8 @@ try:
     from tkinter import messagebox
     from tkinter import ttk
 
-except ImportError: # Python 2
-    try:
-        import Tkinter as tkinter
-        import ttk
-        import tkFileDialog as filedialog
-        import tkMessageBox as messagebox
-        
-    except ImportError:
-        raise ImportError("Tcl/Tk (tkinter) is not installed!")
+except ImportError:
+    raise ImportError("Tcl/Tk (tkinter) is not installed!")
 
 from PIL import Image, ImageTk
 
@@ -25,6 +37,8 @@ IMAGE_SCALING_ALGORITHM = Image.LANCZOS
 
 HAND_CURSOR = "@C:/Windows/Cursors/aero_link.cur" if os.path.exists("C:/Windows/Cursors/aero_link.cur") else None
 DEFAULT_CURSOR = ""
+
+Spinbox = ttk.Spinbox if hasattr(ttk, "Spinbox") else tkinter.Spinbox
 
 class PlaceholderEntry(ttk.Entry):
     widget_id = 1
@@ -845,7 +859,7 @@ def edit_macro_dialog(mcr):
     mousewheel_amount_label = tkinter.Label(move_mousewheel_frame, text="Amount:")
     mousewheel_amount_label.grid(row=0, column=0, padx=PADX, pady=PADY)
 
-    mousewheel_amount = ttk.Spinbox(move_mousewheel_frame, value=tuple(filter(bool, range(-100,101))), width=4, textvariable=mousewheel_amount_var)
+    mousewheel_amount = Spinbox(move_mousewheel_frame, value=tuple(filter(bool, range(-100,101))), width=4, textvariable=mousewheel_amount_var)
     mousewheel_amount.grid(row=0, column=1, padx=PADX, pady=PADY)
 
     mousewheel_horizontal_radiobutton = ttk.Radiobutton(move_mousewheel_frame, text="Horizontal", value="horizontal", variable=mousewheel_horizontal_var)
@@ -1409,7 +1423,7 @@ def record_macro_dialog():
     countdown_label = tkinter.Label(frame, text="Countdown (in seconds):")
     countdown_label.grid(column=0, row=2, columnspan=2, sticky=tkinter.E, padx=PADX, pady=PADY)
 
-    countdown_spinbox = ttk.Spinbox(frame, from_=0, to=10, width=3, textvariable = options["countdown"])
+    countdown_spinbox = Spinbox(frame, from_=0, to=10, width=3, textvariable = options["countdown"])
     countdown_spinbox.grid(column=2, row=2, columnspan=2, sticky=tkinter.W, padx=PADX, pady=PADY)
 
     radiobutton_descr_label = tkinter.Label(frame, text="Stop recording by:")
@@ -1641,7 +1655,7 @@ def create_window():
 
     registered_validate_repeat = root.register(validate_repeat)
 
-    repeat_spinbox = ttk.Spinbox(play_area, from_=0, to=9999, width=4, textvariable=repeat_var, validate="all", validatecommand=(registered_validate_repeat, "%P"))
+    repeat_spinbox = Spinbox(play_area, from_=0, to=9999, width=4, textvariable=repeat_var, validate="all", validatecommand=(registered_validate_repeat, "%P"))
     repeat_spinbox.grid(column=1, row=0, padx=PADX, pady=PADY)
 
     repeat_var.set("0")
@@ -1741,7 +1755,7 @@ def create_window():
     compression_level_label = tkinter.Label(save_area, text="Compression level:")
     compression_level_label.grid(column=0, row=0, padx=PADX, pady=PADY, sticky=tkinter.E)
 
-    compression_level_spinbox = ttk.Spinbox(save_area, from_=0, to=9, width=2, textvariable=compression_level_var, validate="all", validatecommand=(registered_validate_compression_level, "%P"))
+    compression_level_spinbox = Spinbox(save_area, from_=0, to=9, width=2, textvariable=compression_level_var, validate="all", validatecommand=(registered_validate_compression_level, "%P"))
     compression_level_spinbox.grid(column=1, row=0, padx=PADX, pady=PADY, sticky=tkinter.W)
 
     compression_level_var.set(config.get("compression_level", "9"))

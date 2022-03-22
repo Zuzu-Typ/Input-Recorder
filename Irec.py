@@ -1,4 +1,3 @@
-#!/usr/bin/python
 
 """
 Input Recorder - Record and play back keyboard and mouse input.
